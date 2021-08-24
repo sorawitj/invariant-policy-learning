@@ -3,8 +3,12 @@ import pandas as pd
 import seaborn as sns
 from scipy.stats import kruskal, mannwhitneyu
 
-def SIR(idx, w, m, replace):
-    sample_idx = np.random.choice(idx, size=m, replace=replace, p=w / np.sum(w))
+
+def SIR(idx, W, m, replace):
+    # avoid zero entries
+    W += np.finfo(float).eps
+    W = W / np.sum(W)
+    sample_idx = np.random.choice(idx, size=m, replace=replace, p=W)
     return sample_idx
 
 
@@ -25,6 +29,7 @@ def rate_fn(pow, c=1):
 
     return f
 
+
 def fit_m(A, context, W, n_iter=20):
     def inner_pval(context, s_idx):
         pval = []
@@ -33,10 +38,10 @@ def fit_m(A, context, W, n_iter=20):
 
         return context.shape[1] * np.min(pval)
 
-    threshold = np.quantile(np.random.uniform(size=(100000, n_iter)).mean(-1), 0.001)
+    threshold = np.quantile(np.random.uniform(size=(100000, n_iter)).mean(-1), 0.01)
 
     n = A.shape[0]
-    m_size = np.linspace(n ** 0.6, n ** 1.0, 20)
+    m_size = np.linspace(n ** 0.6, n ** 0.9, 10)
 
     ret_m = m_size[0]
     for m in m_size:
@@ -97,6 +102,43 @@ def invariance_test_actions(model, subset, X, A, Y, E):
             print('skip')
 
     final_pval = len(pd.unique(A)) * np.min(pvals)
+
+    return subset_name, final_pval
+
+
+def invariance_test_resample(model, subset, X, A, Y, E, W, rate):
+    subset_name, subset_idx = subset
+
+    # handle empty set
+    if len(subset_idx) > 0:
+        model.fit_intercept = True
+        X = X[:, subset_idx]
+    else:
+        model.fit_intercept = False
+        X = np.ones(shape=(X.shape[0], 1))
+
+    s_idx = resampling(rate, E, W=W, replace=False)
+    # resample
+    X_s, A_s, Y_s, E_s = X[s_idx], A[s_idx], Y[s_idx], E[s_idx]
+
+    res_e = dict([(e, []) for e in pd.unique(E_s)])
+    for a in pd.unique(A_s):
+        if len(E_s[A_s == a]) < 2:
+            continue
+        X_a, Y_a, E_a = X_s[A_s == a], Y_s[A_s == a], E_s[A_s == a]
+
+        model.fit(X_a, Y_a)
+
+        res = Y_a - model.predict(X_a)
+        for e in pd.unique(E_s):
+            res_e[e] += [res[E_a == e]]
+
+    residuals = [np.concatenate(r) for r in res_e.values()]
+
+    if len(residuals) == 2:
+        final_pval = mannwhitneyu(residuals[0], residuals[1]).pvalue
+    else:
+        final_pval = kruskal(*residuals).pvalue
 
     return subset_name, final_pval
 

@@ -22,11 +22,6 @@ class Environment(object):
         self.bR = inv_state.normal(0, 1, size=(n_actions, 2))
         non_inv_state = np.random.RandomState(non_inv_seed)
         if train:
-            # scale = 1
-            # cov1 = sample_cov_matrix(self.n_env, 3, non_inv_state, scale)
-            # cov2 = sample_cov_matrix(self.n_env, 3, non_inv_state, scale)
-            # self.bH1 = non_inv_state.multivariate_normal(np.zeros(self.n_env), cov=cov1)[:, np.newaxis]
-            # self.bH2 = non_inv_state.multivariate_normal(np.zeros(self.n_env), cov=cov2)[:, np.newaxis]
             scale = 2
             self.bH1 = non_inv_state.normal(size=(self.n_env, 1), scale=scale)
             self.bH2 = non_inv_state.normal(size=(self.n_env, 1), scale=scale)

@@ -82,7 +82,6 @@ class NaivePolicy(DPolicy):
     def forward(self, X):
         return F.softmax(self.score.repeat(X.shape[0], 1), dim=1)
 
-
 class LinearPolicy(DPolicy):
     def __init__(self, target_set, n_actions, name='Linear'):
         self.name = name

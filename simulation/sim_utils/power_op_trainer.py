@@ -6,21 +6,21 @@ import sys, os
 # add invariant test module
 sys.path.append(os.path.abspath(os.path.join('..', 'invariant_test_utils')))
 
-from invariant_test import SIR
+from invariant_test import resampling, invariance_test
 
 
 class PowerOpTrainer(object):
 
     def __init__(self, n_iters, batch_size,
-                 n_sampling, tester, true_coef=False):
+                 rate, model, true_coef=False):
         self.n_iters = n_iters
         self.batch_size = batch_size
-        self.n_sampling = n_sampling
-        self.tester = tester
+        self.rate = rate
+        self.test_model = model
         self.true_coef = true_coef
 
-    def train(self, X, A, R, E, P,
-              policy, target_set):
+    def train(self, X, A, Y, E, P,
+              policy, subset):
         optimizer = optim.Adam(policy.parameters(), lr=1e-1)
         prev_running_pval = 1.
         running_pval = None
@@ -32,16 +32,16 @@ class PowerOpTrainer(object):
             log_probs = []
             for _ in range(self.batch_size):
                 target_P = policy.get_prob(X, A)
-                w = target_P / torch.from_numpy(P)
-                w = w / torch.sum(w)
+                W = target_P / torch.from_numpy(P)
+                W = W / torch.sum(W)
 
-                s_idx = SIR(w.detach().numpy(), self.n_sampling * self.tester.n_env, True)
-                s_prob = w[s_idx]
+                s_idx = resampling(self.rate, E, W=W.detach().numpy(), replace=False)
+                s_prob = W[s_idx]
 
-                t_stat, pvalue = self.tester.get_test_stat(X, A, R, E,
-                                                           target_set=target_set,
-                                                           s_idx=s_idx,
-                                                           true_coef=self.true_coef)
+                X_s, Y_s, E_s = X[s_idx], Y[s_idx], E[s_idx]
+
+                _, pvalue = invariance_test(self.test_model, subset, X_s, Y_s, E_s)
+
                 pvals.append(pvalue)
                 log_probs.append(torch.log(s_prob).sum())
 
