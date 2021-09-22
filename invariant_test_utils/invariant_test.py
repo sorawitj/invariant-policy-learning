@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import kruskal, mannwhitneyu
+from scipy.stats import kruskal, mannwhitneyu, f_oneway
+
 
 def SIR(idx, w, m, replace):
     sample_idx = np.random.choice(idx, size=m, replace=replace, p=w / np.sum(w))
@@ -24,6 +25,7 @@ def rate_fn(pow, c=1):
     def f(n): return c * n ** pow
 
     return f
+
 
 def fit_m(A, context, W, n_iter=20):
     def inner_pval(context, s_idx):
@@ -52,21 +54,28 @@ def fit_m(A, context, W, n_iter=20):
     return ret_m
 
 
-def invariance_test(model, subset, X, Y, E):
+def invariance_test(model, subset, X, Y, E, fit=False):
     subset_name, subset_idx = subset
 
+    if fit:
+        # fit the model with the given subset
+        # handle empty set
+        if len(subset_idx) > 0:
+            model.fit_intercept = True
+            feature_subset = X[:, subset_idx]
+        else:
+            model.fit_intercept = False
+            feature_subset = np.ones(shape=(X.shape[0], 1))
+
+        model.fit(feature_subset, Y)
+
+    # test for invariance
     # fit the model with the given subset
     # handle empty set
     if len(subset_idx) > 0:
-        model.fit_intercept = True
         feature_subset = X[:, subset_idx]
     else:
-        model.fit_intercept = False
         feature_subset = np.ones(shape=(X.shape[0], 1))
-
-    model.fit(feature_subset, Y)
-
-    # test for invariance
     residuals = []
     for e in pd.unique(E):
         env_idx = E == e
@@ -74,7 +83,7 @@ def invariance_test(model, subset, X, Y, E):
         reward_e = Y[env_idx]
         residuals += [reward_e - pred_e]
 
-    if len(residuals) == 2:
+    if len(residuals) == -1:
         pval = mannwhitneyu(residuals[0], residuals[1]).pvalue
     else:
         pval = kruskal(*residuals).pvalue
@@ -91,7 +100,9 @@ def invariance_test_actions(model, subset, X, A, Y, E):
         X_a, Y_a, E_a = X[A == a], Y[A == a], E[A == a]
         # skip when Ea has only one group
         if len(pd.unique(E_a)) > 1:
-            _, pval = invariance_test(model, subset, X_a, Y_a, E_a)
+            if type(model) is dict:
+                md = model[str(a) + str(subset[0]) + str(len(pd.unique(E)))]
+            _, pval = invariance_test(md, subset, X_a, Y_a, E_a)
             pvals += [pval]
         else:
             print('skip')

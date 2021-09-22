@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from multiprocessing import Pool, cpu_count
-from invariant_test import invariance_test_actions_resample, fit_m, rate_fn
+from invariant_test import invariance_test_actions_resample, fit_m, rate_fn, invariance_test_actions, invariance_test
 
 n_actions = 3
 inv_seed = 111
@@ -26,12 +26,33 @@ target_sets = {r'$\emptyset$': [],
 np.random.seed(seed)
 
 n_envs = [2, 6]
-s_sizes = [1000, 3000, 9000, 27000, 81000]
+s_sizes = [1000, 2000, 4000, 8000, 16000]
 
 random_policy = RandomPolicy(n_actions)
 loggin_env = Environment(1, n_actions, 1, 1)
 X_log, A_log, R_log, _, _ = loggin_env.gen_data(random_policy, int(1e4))
-loggin_policy = Policy(train_lsq(X_log, R_log, target_sets['X1,X2']), target_sets['X1,X2'], 3.)
+loggin_policy = Policy(train_lsq(X_log, R_log, [0, 1]), [0, 1], 100.)
+
+# get model fit
+models = {}
+for a in range(n_actions):
+    for subset in target_sets.items():
+        model = LinearRegression()
+        for n_env in n_envs:
+            train_env = Environment(n_env, n_actions, inv_seed=inv_seed, non_inv_seed=seed, train=True)
+            XX, AA, RR, _, _ = train_env.gen_data(loggin_policy, int(1e6))
+            YY = RR[np.arange(len(RR)), AA]
+            # fit the model with the given subset
+            # handle empty set
+            if len(subset[1]) > 0:
+                model.fit_intercept = True
+                feature_subset = XX[:, subset[1]]
+            else:
+                model.fit_intercept = False
+                feature_subset = np.ones(shape=(XX.shape[0], 1))
+
+            model.fit(feature_subset[AA == a], YY[AA == a])
+            models[str(a) + str(subset[0]) + str(n_env)] = model
 
 
 def verify_policies(s_size,
@@ -41,7 +62,6 @@ def verify_policies(s_size,
                     inv_seed=inv_seed,
                     non_inv_seed=seed,
                     alpha=0.05):
-    model = LinearRegression()
     train_size = int(s_size / n_env)
 
     train_env = Environment(n_env, n_actions, inv_seed=inv_seed, non_inv_seed=non_inv_seed, train=True)
@@ -55,8 +75,11 @@ def verify_policies(s_size,
     m = fit_m(A, X, W, n_iter=10)
     rate = rate_fn(1, m / s_size)
     for subset in target_sets.items():
-        target_name, p_val = invariance_test_actions_resample(model, subset,
+        target_name, p_val = invariance_test_actions_resample(models, subset,
                                                               X, A, Y, E, W, rate)
+
+        # target_name, p_val = invariance_test_actions(models, subset,
+        #                                              X, A, Y, E)
         is_invs[target_name] = p_val >= alpha
 
     return is_invs
@@ -107,5 +130,6 @@ if __name__ == '__main__':
     for ax in g.axes[0]:
         ax.axhline(0.95, ls='--', color='black', label='95% level', linewidth=0.85, alpha=0.7)
         plt.legend(bbox_to_anchor=(1.5, 1.2))
+    plt.tight_layout()
 
-    plt.savefig('results/invariant_test_utils.pdf')
+    plt.savefig('results/invariant_test_utils_truecoef.pdf')
