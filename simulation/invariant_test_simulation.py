@@ -26,12 +26,12 @@ target_sets = {r'$\emptyset$': [],
 np.random.seed(seed)
 
 n_envs = [2, 6]
-s_sizes = [1000, 2000, 4000, 8000, 16000]
+s_sizes = [1000, 3000, 9000, 27000, 81000]
 
 random_policy = RandomPolicy(n_actions)
 loggin_env = Environment(1, n_actions, 1, 1)
 X_log, A_log, R_log, _, _ = loggin_env.gen_data(random_policy, int(1e4))
-loggin_policy = Policy(train_lsq(X_log, R_log, [0, 1]), [0, 1], 100.)
+loggin_policy = Policy(train_lsq(X_log, R_log, [0, 1]), [0, 1], 1.75)
 
 # get model fit
 models = {}
@@ -40,7 +40,8 @@ for a in range(n_actions):
         model = LinearRegression()
         for n_env in n_envs:
             train_env = Environment(n_env, n_actions, inv_seed=inv_seed, non_inv_seed=seed, train=True)
-            XX, AA, RR, _, _ = train_env.gen_data(loggin_policy, int(1e6))
+            uniform_policy = Policy(train_lsq(X_log, R_log, [0, 1]), [0, 1], 1000)
+            XX, AA, RR, _, _ = train_env.gen_data(uniform_policy, int(1e6))
             YY = RR[np.arange(len(RR)), AA]
             # fit the model with the given subset
             # handle empty set
@@ -132,4 +133,4 @@ if __name__ == '__main__':
         plt.legend(bbox_to_anchor=(1.5, 1.2))
     plt.tight_layout()
 
-    plt.savefig('results/invariant_test_utils_truecoef.pdf')
+    plt.savefig('results/invariant_test_truecoef.pdf')
