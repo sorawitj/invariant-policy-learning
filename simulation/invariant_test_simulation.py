@@ -31,7 +31,7 @@ s_sizes = [1000, 3000, 9000, 27000, 81000]
 random_policy = RandomPolicy(n_actions)
 loggin_env = Environment(1, n_actions, 1, 1)
 X_log, A_log, R_log, _, _ = loggin_env.gen_data(random_policy, int(1e4))
-loggin_policy = Policy(train_lsq(X_log, R_log, target_sets['X1,X2']), target_sets['X1,X2'], 3.)
+loggin_policy = Policy(train_lsq(X_log, R_log, target_sets['X1,X2']), target_sets['X1,X2'], 1.5)
 
 
 def verify_policies(s_size,
@@ -107,5 +107,6 @@ if __name__ == '__main__':
     for ax in g.axes[0]:
         ax.axhline(0.95, ls='--', color='black', label='95% level', linewidth=0.85, alpha=0.7)
         plt.legend(bbox_to_anchor=(1.5, 1.2))
+    plt.tight_layout()
 
-    plt.savefig('results/invariant_test_utils.pdf')
+    plt.savefig('results/invariant_test.pdf')
