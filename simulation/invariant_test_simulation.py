@@ -31,7 +31,7 @@ s_sizes = [1000, 3000, 9000, 27000, 81000]
 random_policy = RandomPolicy(n_actions)
 loggin_env = Environment(1, n_actions, 1, 1)
 X_log, A_log, R_log, _, _ = loggin_env.gen_data(random_policy, int(1e4))
-loggin_policy = Policy(train_lsq(X_log, R_log, target_sets['X1,X2']), target_sets['X1,X2'], 1.5)
+loggin_policy = Policy(train_lsq(X_log, R_log, target_sets['X1,X2']), target_sets['X1,X2'], 1.75)
 
 
 def verify_policies(s_size,
